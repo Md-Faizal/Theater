@@ -73,9 +73,9 @@ jobs:
     needs: [pre-flight-check]
     runs-on: ubuntu-latest
     env:
-      SSH_HOST: ${{ secrets.SSH_HOST || secrets.COS_HOST || '129.154.32.125' }}
-      SSH_USER: ${{ secrets.SSH_USER || secrets.COS_USER || 'ubuntu' }}
-      SSH_KEY: ${{ secrets.SSH_KEY || secrets.COS_SSH_PRIVATE_KEY }}
+      SSH_HOST: ${{ secrets.COS_SSH_HOST || secrets.SSH_HOST || secrets.COS_HOST || '129.154.32.125' }}
+      SSH_USER: ${{ secrets.COS_SSH_USER || secrets.SSH_USER || secrets.COS_USER || 'ubuntu' }}
+      SSH_KEY: ${{ secrets.COS_SSH_KEY || secrets.SSH_KEY || secrets.COS_SSH_PRIVATE_KEY }}
       TARGET_DIR: /home/ubuntu/stack/apps/threater
       DRY_RUN: ${{ github.event.inputs.dry_run || false }}
       REBUILD_DOCKER: ${{ github.event.inputs.rebuild_docker || false }}
