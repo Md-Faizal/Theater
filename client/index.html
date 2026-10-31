@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IMAX Virtual Cinema</title>
   <link rel="stylesheet" href="/src/style.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -46,6 +47,7 @@
           <input id="avatar-color" type="color" value="#00a2ff" />
         </label>
         <button id="profile-submit" type="submit" class="primary" disabled>Connect Multiplayer & Enter</button>
+        <div id="google-login-btn-container" style="display: flex; justify-content: center; margin: 8px 0;"></div>
         <button id="solo-submit" type="button" class="secondary">Enter IMAX (Solo Mode)</button>
         <p id="join-error" class="error" role="alert"></p>
         <p class="fine-print">Solo mode lets you watch YouTube videos, showcase reels, OTT streams, and local files

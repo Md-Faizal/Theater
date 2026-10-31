@@ -11,13 +11,17 @@ services:
     container_name: threater-app
     restart: unless-stopped
     network_mode: host
+    env_file:
+      - .env
     environment:
-      - THREATER_ADDR=0.0.0.0:3030
-      - DATABASE_URL=sqlite:///app/data/threater.db
-      - CLIENT_DIST=/app/client/dist
-      - THREATER_DEV_AUTH=true
-      - THREATER_COOKIE_SECURE=false
-      - RUST_LOG=info
+      - THREATER_ADDR=${THREATER_ADDR:-0.0.0.0:3030}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/threater.db}
+      - CLIENT_DIST=${CLIENT_DIST:-/app/client/dist}
+      - THREATER_DEV_AUTH=${THREATER_DEV_AUTH:-false}
+      - THREATER_COOKIE_SECURE=${THREATER_COOKIE_SECURE:-true}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - RUST_LOG=${RUST_LOG:-info}
     volumes:
       - /home/ubuntu/stack/apps/threater/data:/app/data
     healthcheck:

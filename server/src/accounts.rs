@@ -3,7 +3,7 @@ use axum::{
     extract::{Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
-    routing::{get, put},
+    routing::{get, post, put},
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -103,6 +103,7 @@ pub fn router() -> axum::Router<AccountState> {
             get(username_availability),
         )
         .route("/api/account/profile", put(update_profile))
+        .route("/api/account/google-login", post(google_login))
 }
 
 fn unix_time() -> i64 {
@@ -430,6 +431,169 @@ async fn update_profile(
             .await
             .map_err(ApiError::internal)?,
     ))
+}
+
+#[derive(Deserialize)]
+pub struct GoogleLoginRequest {
+    credential: String,
+}
+
+#[derive(Deserialize)]
+struct GoogleTokenInfo {
+    sub: Option<String>,
+    email: Option<String>,
+    name: Option<String>,
+    aud: Option<String>,
+}
+
+async fn google_login(
+    State(state): State<AccountState>,
+    Json(payload): Json<GoogleLoginRequest>,
+) -> Result<Response, ApiError> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://oauth2.googleapis.com/tokeninfo")
+        .query(&[("id_token", &payload.credential)])
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!(%e, "Failed to call Google tokeninfo endpoint");
+            ApiError::new(
+                StatusCode::BAD_GATEWAY,
+                "Google authentication service unreachable",
+            )
+        })?;
+
+    if !res.status().is_success() {
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Invalid Google authentication token",
+        ));
+    }
+
+    let token_info: GoogleTokenInfo = res.json().await.map_err(|e| {
+        tracing::error!(%e, "Failed to parse Google tokeninfo response");
+        ApiError::new(
+            StatusCode::BAD_GATEWAY,
+            "Invalid response from Google tokeninfo",
+        )
+    })?;
+
+    let sub = match token_info.sub {
+        Some(s) if !s.trim().is_empty() => s,
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::UNAUTHORIZED,
+                "Missing Google subject identifier",
+            ));
+        }
+    };
+
+    let configured_client_id = std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| {
+        "1018234915270-6h216gbkq8rcepmhhq4tnsgjlmr04gf2.apps.googleusercontent.com".to_string()
+    });
+    if let Some(aud) = token_info.aud {
+        if aud != configured_client_id {
+            tracing::warn!(%aud, %configured_client_id, "Google token audience mismatch");
+            return Err(ApiError::new(
+                StatusCode::UNAUTHORIZED,
+                "Google Client ID mismatch",
+            ));
+        }
+    }
+
+    let display_name = token_info.name.unwrap_or_else(|| {
+        token_info
+            .email
+            .clone()
+            .unwrap_or_else(|| "Cinema Guest".to_string())
+    });
+
+    let now = unix_time();
+
+    // Check if identity exists
+    let existing_identity = sqlx::query(
+        "SELECT user_id FROM auth_identities WHERE provider = 'google' AND provider_subject = ?",
+    )
+    .bind(&sub)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(ApiError::internal)?;
+
+    let user_id = if let Some(row) = existing_identity {
+        row.get::<String, _>("user_id")
+    } else {
+        // Create new user and identity
+        let new_user_id = Uuid::new_v4().to_string();
+        let identity_id = Uuid::new_v4().to_string();
+
+        let mut tx = state.pool.begin().await.map_err(ApiError::internal)?;
+
+        sqlx::query(
+            "INSERT INTO users (id, display_name, avatar_color, created_at, updated_at) VALUES (?, ?, '#4285F4', ?, ?)"
+        )
+        .bind(&new_user_id)
+        .bind(&display_name)
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(ApiError::internal)?;
+
+        sqlx::query(
+            "INSERT INTO auth_identities (id, user_id, provider, provider_subject, created_at) VALUES (?, ?, 'google', ?, ?)"
+        )
+        .bind(&identity_id)
+        .bind(&new_user_id)
+        .bind(&sub)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(ApiError::internal)?;
+
+        tx.commit().await.map_err(ApiError::internal)?;
+        new_user_id
+    };
+
+    // Create a new session for this user
+    let token = Uuid::new_v4().to_string();
+    let session_id = Uuid::new_v4().to_string();
+    let expires_at = now + SESSION_TTL_SECONDS;
+
+    sqlx::query(
+        "INSERT INTO sessions (id, user_id, token_hash, auth_method, expires_at, created_at) VALUES (?, ?, ?, 'oauth', ?, ?)"
+    )
+    .bind(&session_id)
+    .bind(&user_id)
+    .bind(token_hash(&token))
+    .bind(expires_at)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(ApiError::internal)?;
+
+    let session_user = SessionUser {
+        user_id,
+        development_session: false,
+    };
+
+    let profile = load_profile(&state.pool, session_user)
+        .await
+        .map_err(ApiError::internal)?;
+
+    let mut response = Json(profile).into_response();
+    let secure = if state.secure_cookies { "; Secure" } else { "" };
+    let cookie_val = format!(
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={SESSION_TTL_SECONDS}{secure}"
+    );
+
+    if let Ok(header_val) = HeaderValue::from_str(&cookie_val) {
+        response
+            .headers_mut()
+            .insert(header::SET_COOKIE, header_val);
+    }
+
+    Ok(response)
 }
 
 pub fn cookie_secure_from_env() -> bool {

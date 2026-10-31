@@ -7,3 +7,4 @@ export function apiUrl(path: string): string {
   const prefix = window.location.pathname.startsWith("/fun") ? "/fun" : "";
   return `${prefix}${cleanPath}`;
 }
+

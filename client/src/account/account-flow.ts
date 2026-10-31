@@ -72,13 +72,60 @@ export class AccountFlow {
       this.avatarColorInput.value = result.avatar_color;
       this.usernameStatus.textContent = "Choose a unique username for this room community.";
       this.profileUsernameInput.focus();
+      this.initGoogleAuth();
     } catch (error) {
       this.joinError.textContent = error instanceof Error
         ? `${error.message} Click 'Enter IMAX (Solo Mode)' to explore and watch videos immediately.`
         : "Multiplayer server offline. Click 'Enter IMAX (Solo Mode)' below.";
       this.usernameStatus.textContent = "Multiplayer service offline.";
       this.usernameStatus.className = "field-status unavailable";
+      this.initGoogleAuth();
     }
+  }
+
+  private initGoogleAuth() {
+    const googleClientId = "1018234915270-6h216gbkq8rcepmhhq4tnsgjlmr04gf2.apps.googleusercontent.com";
+    const container = document.getElementById("google-login-btn-container");
+    if (!container) return;
+
+    const render = () => {
+      // @ts-ignore
+      if (typeof window.google !== "undefined" && window.google.accounts?.id) {
+        // @ts-ignore
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response: { credential?: string }) => {
+            if (!response.credential) return;
+            try {
+              const res = await fetch(apiUrl("/api/account/google-login"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ credential: response.credential }),
+              });
+              const data = await res.json();
+              if (res.ok && data.user_id) {
+                this.joinScreen.classList.add("hidden");
+                this.options.onEnter(data, this.roomInput.value.trim() || "imax-auditorium");
+              } else {
+                this.joinError.textContent = data.error || "Google login failed";
+              }
+            } catch {
+              this.joinError.textContent = "Network error during Google sign-in";
+            }
+          },
+        });
+        // @ts-ignore
+        window.google.accounts.id.renderButton(container, {
+          theme: "filled_blue",
+          size: "large",
+          shape: "pill",
+          text: "continue_with",
+        });
+      } else {
+        setTimeout(render, 300);
+      }
+    };
+    render();
   }
 
   private onUsernameInput() {
