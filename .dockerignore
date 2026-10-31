@@ -4,7 +4,6 @@
 
 # Rust build artifacts
 target/
-Cargo.lock
 
 # Node.js dependencies and builds
 node_modules/
