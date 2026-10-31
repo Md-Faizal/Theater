@@ -17,7 +17,7 @@ RUN npm run build
 # ==============================================================================
 # Stage 2: Build Backend (Rust Axum / SQLite Server)
 # ==============================================================================
-FROM rust:1.85-bookworm AS server-builder
+FROM rust:latest AS server-builder
 
 WORKDIR /build
 

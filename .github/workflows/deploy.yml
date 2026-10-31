@@ -54,7 +54,7 @@ jobs:
       - name: 🦀 Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: ⚡ Cache Rust Dependencies
@@ -205,3 +205,4 @@ jobs:
             echo "❌ Smoke test FAILED after 30s (HTTP: $HTTP)"
             exit 1
           fi
+
