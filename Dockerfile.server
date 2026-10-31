@@ -1,0 +1,58 @@
+# ==============================================================================
+# Dedicated Rust Backend Server Container
+# ==============================================================================
+FROM rust:1.85-bookworm AS builder
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.lock ./
+COPY server/Cargo.toml server/
+
+# Pre-cache dependencies
+RUN mkdir -p server/src && \
+    echo "fn main() {}" > server/src/main.rs && \
+    cargo build --release -p virtual-cinema-server && \
+    rm -rf server/src
+
+COPY server/src server/src
+COPY server/migrations server/migrations
+
+RUN touch server/src/main.rs && \
+    cargo build --release -p virtual-cinema-server && \
+    strip /build/target/release/virtual-cinema-server
+
+# Runtime Stage
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        sqlite3 \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN groupadd -r threater && useradd -r -g threater threater && \
+    mkdir -p /app/data && \
+    chown -R threater:threater /app
+
+COPY --from=builder /build/target/release/virtual-cinema-server /usr/local/bin/virtual-cinema-server
+
+USER threater
+
+ENV THREATER_ADDR=0.0.0.0:3000 \
+    DATABASE_URL=sqlite:///app/data/threater.db \
+    THREATER_DEV_AUTH=true \
+    THREATER_COOKIE_SECURE=false \
+    RUST_LOG=info
+
+VOLUME ["/app/data"]
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://127.0.0.1:3000/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/virtual-cinema-server"]

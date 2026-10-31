@@ -1,0 +1,40 @@
+# Version control
+.git
+.gitignore
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Node.js dependencies and builds
+node_modules/
+client/node_modules/
+client/dist/
+*.tsbuildinfo
+client/tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Local databases and runtime state
+data/*.db
+data/*.db-shm
+data/*.db-wal
+threater.db
+threater.db-shm
+threater.db-wal
+
+# Binaries and downloaded executables
+*.exe
+yt-dlp.exe
+server/yt-dlp.exe
+
+# Logs and environment files
+*.log
+server_run.log
+.env
+.env.*
+.DS_Store
+
+# IDE and scratch directories
+.idea/
+.vscode/
+scratch/

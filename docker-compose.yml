@@ -1,0 +1,76 @@
+services:
+  # ============================================================================
+  # All-in-One Production Deployment (Client + Server + SQLite)
+  # Run with: docker compose up -d
+  # ============================================================================
+  threater:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: threater:latest
+    container_name: threater-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - THREATER_ADDR=0.0.0.0:3000
+      - DATABASE_URL=sqlite:///app/data/threater.db
+      - CLIENT_DIST=/app/client/dist
+      - THREATER_DEV_AUTH=true
+      - THREATER_COOKIE_SECURE=false
+      - RUST_LOG=info
+    volumes:
+      - threater_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================================
+  # Optional: Split Architecture Profile (Nginx Frontend + Rust Backend)
+  # Run with: docker compose --profile split up -d
+  # ============================================================================
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: threater-server:latest
+    container_name: threater-backend
+    restart: unless-stopped
+    profiles: ["split"]
+    ports:
+      - "3001:3000"
+    environment:
+      - THREATER_ADDR=0.0.0.0:3000
+      - DATABASE_URL=sqlite:///app/data/threater.db
+      - THREATER_DEV_AUTH=true
+      - THREATER_COOKIE_SECURE=false
+      - RUST_LOG=info
+    volumes:
+      - threater_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    image: threater-client:latest
+    container_name: threater-frontend
+    restart: unless-stopped
+    profiles: ["split"]
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
+
+volumes:
+  threater_data:
+    name: threater_data
+    driver: local

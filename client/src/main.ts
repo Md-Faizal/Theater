@@ -11,6 +11,7 @@ import { VenueMinimap } from "./world/navigation/venue-minimap";
 import { cameraEyeHeight, createPlayerController, type PlayerController } from "./world/physics/player-controller";
 import { buildVenue } from "./world/maps/venue";
 import { CinemaCast, INDIAN_OTT_PLATFORMS } from "./media/cinema-cast";
+import { createCuttingEdgeRenderer } from "./world/rendering/cutting-edge-renderer";
 import "./style.css";
 
 const $ = <T extends HTMLElement>(id: string) => {
@@ -75,20 +76,8 @@ camera.position.set(-26.0, 1.7, 0.0); // Spawn at the start of Red Carpet Concou
 camera.rotation.order = "YXZ";
 camera.rotation.y = 0; // Facing East towards the IMAX Cinema anchor
 
-// 1. WebGL Renderer for 3D Geometry (layer on top with alpha: true for depth occlusion)
-const renderer = new THREE.WebGLRenderer({
-  antialias: true,
-  alpha: true,
-  powerPreference: "high-performance",
-});
-renderer.setClearColor(0x000000, 0);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+// 1. Cutting-Edge 3D Renderer (WebGPU with automatic WebGL 2.0 fallback)
+const renderer = await createCuttingEdgeRenderer();
 renderer.domElement.style.position = "absolute";
 renderer.domElement.style.inset = "0";
 renderer.domElement.style.zIndex = "2";
@@ -124,6 +113,7 @@ let playerController: PlayerController | null = null;
   camera,
   getPlayerController: () => playerController,
   venue,
+  getRendererStats: () => renderer.getStats(),
 };
 
 function showToast(message: string) {
@@ -448,21 +438,41 @@ function resize() {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   cssRenderer.setSize(innerWidth, innerHeight);
 }
 
+// Fixed-timestep physics accumulator for 144Hz high refresh rate screens
+let physicsAccumulator = 0;
+const FIXED_PHYSICS_STEP = 1 / 120; // 120Hz deterministic physics sub-stepping
+let frameCount = 0;
+let cachedTargetSeat: ReturnType<typeof getTargetSeat> = null;
+
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
-  movePlayer(delta);
+  const delta = Math.min(clock.getDelta(), 0.1);
+
+  // Sub-step physics at fixed 120Hz for zero-jitter, frame-rate-independent physics
+  physicsAccumulator += delta;
+  while (physicsAccumulator >= FIXED_PHYSICS_STEP) {
+    movePlayer(FIXED_PHYSICS_STEP);
+    venue.updateDoors?.(camera.position, FIXED_PHYSICS_STEP);
+    physicsAccumulator -= FIXED_PHYSICS_STEP;
+  }
+
   camera.getWorldDirection(minimapDirection);
   minimap?.update(camera.position, minimapDirection, delta);
   remoteAvatars.update(delta);
   spatialAudio.update(camera.position);
   media.updateFrame();
-  venue.updateDoors?.(camera.position, delta);
-  const target = getTargetSeat();
+
+  // Throttle seat raycasting to every 4th frame (~36Hz at 144FPS) to preserve 144Hz frame budget
+  frameCount += 1;
+  if (frameCount % 4 === 0) {
+    cachedTargetSeat = getTargetSeat();
+  }
+
+  const target = cachedTargetSeat;
   const canInteract = target && !seatedOn;
   seatHint.classList.toggle("hidden", !seatedOn && !canInteract);
   if (canInteract) seatHint.textContent = `E sit in ${target.seatId} · Space jump · Esc release mouse`;
