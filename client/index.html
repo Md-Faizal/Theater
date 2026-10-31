@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IMAX Virtual Cinema</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-pill">IMAX</span>
+        <div>
+          <h1>Virtual Cinema</h1>
+          <p id="room-status" class="room-status">Auditorium 1</p>
+        </div>
+      </div>
+      <div class="controls-hint">
+        <span>WASD move · Shift sprint · Mouse look · Space jump · E sit · VR headset & controllers</span>
+      </div>
+    </header>
+
+    <section id="join-screen" class="modal" role="dialog" aria-modal="true">
+      <form id="join-form" class="join-card">
+        <p class="eyebrow">WELCOME TO</p>
+        <h1>IMAX CINEMA</h1>
+        <p>Pick a username and join your friends in the multi-tier virtual auditorium.</p>
+        <label>
+          Room ID
+          <input id="room-input" type="text" value="imax-auditorium" maxlength="32" required />
+        </label>
+        <label>
+          Username
+          <input id="profile-username" type="text" placeholder="unique handle" autocomplete="off" />
+        </label>
+        <span id="username-status" class="field-status"></span>
+        <label>
+          Display Name
+          <input id="display-name" type="text" placeholder="Your Name" required />
+        </label>
+        <label class="color-label">
+          Avatar Color
+          <input id="avatar-color" type="color" value="#00a2ff" />
+        </label>
+        <button id="profile-submit" type="submit" class="primary" disabled>Connect Multiplayer & Enter</button>
+        <button id="solo-submit" type="button" class="secondary">Enter IMAX (Solo Mode)</button>
+        <p id="join-error" class="error" role="alert"></p>
+        <p class="fine-print">Solo mode lets you watch YouTube videos, showcase reels, OTT streams, and local files
+          immediately without server setup.</p>
+      </form>
+    </section>
+
+    <div id="scene"></div>
+
+    <aside class="right-panel">
+      <section class="panel video-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">IMAX EXPERIENCE</span>
+            <h2>Now Showing</h2>
+          </div>
+          <span id="host-badge" class="host-badge hidden">HOST</span>
+        </div>
+
+        <!-- Live Screen Cast Status Banner -->
+        <div id="cast-banner" class="cast-banner hidden">
+          <div class="cast-status-indicator">
+            <span class="cast-live-dot"></span>
+            <span id="cast-stream-name">LIVE CINEMA CAST</span>
+          </div>
+          <button id="stop-cast-button" type="button" class="stop-cast-btn">Stop Cast</button>
+        </div>
+
+        <!-- Indian OTT Hub & Tab Share Action -->
+        <div class="ott-cast-bar">
+          <button id="open-ott-button" type="button" class="ott-cast-trigger"
+            title="Stream Indian OTT or Browser Tab to IMAX">
+            <span>📺</span> Indian OTT Hub & Cast Tab
+          </button>
+        </div>
+
+        <div id="screen-message" class="screen-message">
+          <span class="screen-icon">🎬</span>
+          <span>Paste any YouTube URL, cast an OTT tab, or open a local movie file</span>
+        </div>
+        <video id="screen-video" playsinline autoplay muted crossorigin="anonymous"></video>
+
+        <!-- Showcase Reels & Local File Picker -->
+        <div class="video-source-selector">
+          <div class="selector-row">
+            <select id="showcase-select" class="showcase-select" aria-label="Select Showcase Reel">
+              <option value="">-- Choose a Movie Demo / YouTube Reel --</option>
+              <option value="https://vjs.zencdn.net/v/oceans.mp4">🌊 4K Curved IMAX Cinema: Oceans (Direct MP4 - 100%
+                Curved Screen)</option>
+              <option value="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4">🌸 Cinematic
+                Nature Reel (Direct MP4 - 100% Curved Screen)</option>
+              <option value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">🐰 Animation Cinema: Big Buck Bunny (HLS
+                Stream - 100% Curved Screen)</option>
+              <option value="https://www.youtube.com/watch?v=d9MyW72ELq0">📽️ YouTube 3D: Avatar The Way of Water (IMAX
+                Trailer)</option>
+              <option value="https://www.youtube.com/watch?v=giXco2jaZ_4">✈️ YouTube 3D: Top Gun Maverick (IMAX Flight
+                Demo)</option>
+              <option value="https://www.youtube.com/watch?v=zSWdZVtXT7E">🌌 YouTube 3D: Interstellar (IMAX Space
+                Launch)</option>
+              <option value="https://www.youtube.com/watch?v=Way9Dexny3w">🪐 YouTube 3D: Dune Part Two (IMAX Official
+                Trailer)</option>
+            </select>
+            <button id="load-showcase-button" type="button" class="icon-button" title="Load Reel">▶</button>
+          </div>
+          <div class="file-drop-zone" id="file-drop-zone">
+            <input id="local-file-input" type="file"
+              accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska" class="hidden" />
+            <button id="local-file-button" type="button" class="action-button">📁 Open Local Video File...</button>
+            <span class="drop-hint">or drag & drop video anywhere</span>
+          </div>
+        </div>
+
+        <form id="video-form" class="video-form">
+          <input id="video-url" type="url" placeholder="Paste YouTube link (e.g. youtube.com/watch?v=...) or MP4" />
+          <button type="submit" class="icon-button" aria-label="Load video">↗</button>
+        </form>
+
+        <div class="media-controls">
+          <button id="skip-back-button" class="icon-button" aria-label="Skip back 10 seconds"
+            title="Skip back 10s">↺10</button>
+          <button id="play-button" class="icon-button play-btn" aria-label="Play or pause"
+            title="Play / Pause">▶</button>
+          <button id="skip-forward-button" class="icon-button" aria-label="Skip forward 10 seconds"
+            title="Skip forward 10s">10↻</button>
+          <input id="seek-bar" type="range" min="0" max="1000" value="0" aria-label="Seek video" />
+        </div>
+        <div class="time-and-lights-row">
+          <span id="video-time" class="video-time">0:00 / 0:00</span>
+          <div class="row-actions">
+            <button id="lights-button" class="icon-button small-btn" aria-label="Toggle theater lights"
+              title="Toggle cinema house lights">💡 Lights</button>
+          </div>
+        </div>
+
+        <div class="audio-controls">
+          <button id="mute-button" class="icon-button" aria-label="Mute or unmute" title="Mute / Unmute">🔊</button>
+          <input id="volume-slider" type="range" min="0" max="100" value="80" aria-label="Volume"
+            title="Volume slider" />
+          <span id="volume-label" class="volume-label">80%</span>
+        </div>
+
+        <p id="video-note" class="video-note">Real-time video plays on the full-scale 38.8m-wide, 21m-tall curved IMAX screen with 3D
+          spatial audio & dynamic theater dimming.</p>
+
+        <div class="people-heading">
+          <h3>In this auditorium</h3>
+          <span id="player-count">1</span>
+        </div>
+        <ul id="player-list" class="player-list"></ul>
+      </section>
+
+      <section class="panel chat-panel">
+        <div class="panel-heading">
+          <h2>Auditorium chat</h2>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" maxlength="500" placeholder="Say something…" autocomplete="off" />
+          <button class="icon-button" type="submit" aria-label="Send message">↑</button>
+        </form>
+      </section>
+    </aside>
+
+    <!-- Indian OTT Platforms & Screen Cast Modal -->
+    <div id="ott-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="ott-modal-card">
+        <div class="ott-modal-header">
+          <div>
+            <h2>📺 Indian OTT Hub & Cinema Tab Cast</h2>
+            <p>Stream JioCinema, Hotstar, Netflix, Prime, SonyLIV, YouTube or any tab directly onto the full-scale 38.8m-wide, 21m-tall curved IMAX
+              Screen.</p>
+          </div>
+          <button id="close-ott-button" type="button" class="ott-close-btn" aria-label="Close modal">✕</button>
+        </div>
+
+        <div class="ott-tip-box">
+          💡 <strong>How to stream with friends:</strong> Open an OTT platform below in a tab, then click <strong>"Start
+            IMAX Cast"</strong>. In the Chrome popup, select <strong>"Chrome Tab"</strong> and ensure <strong>"Also
+            share tab audio"</strong> is checked!
+        </div>
+
+        <div id="ott-grid" class="ott-grid">
+          <!-- Populated dynamically from INDIAN_OTT_PLATFORMS -->
+        </div>
+
+        <div class="ott-modal-footer">
+          <button id="start-cast-modal-button" type="button" class="cast-primary-btn">
+            🚀 Start IMAX Cast (Chrome Tab / Screen)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="crosshair" class="crosshair hidden">+</div>
+    <div id="seat-hint" class="seat-hint hidden">E sit · Space stand · Esc release mouse</div>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <div id="drag-overlay" class="drag-overlay hidden">Drop video file here to play on the IMAX screen</div>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>

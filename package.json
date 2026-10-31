@@ -1,0 +1,9 @@
+{
+  "name": "threater-root",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "client"
+  ]
+}
+

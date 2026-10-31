@@ -1,0 +1,33 @@
+# Binaries & Executables
+*.exe
+yt-dlp.exe
+server/yt-dlp.exe
+
+# Build Artifacts
+/target
+/node_modules
+/client/node_modules
+/client/dist
+*.tsbuildinfo
+client/tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Database & Persistent Data
+/threater.db
+/threater.db-shm
+/threater.db-wal
+/data/*.db
+/data/*.db-shm
+/data/*.db-wal
+
+# Logs & Environment
+*.log
+server_run.log
+.env
+.env.local
+.DS_Store
+
+# IDE / Editor
+.idea
+.vscode/*
+!.vscode/tasks.json

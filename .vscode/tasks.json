@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run: Backend",
+      "type": "process",
+      "command": "${env:USERPROFILE}\\.cargo\\bin\\cargo.exe",
+      "args": [
+        "+stable-x86_64-pc-windows-gnu",
+        "run",
+        "-p",
+        "virtual-cinema-server"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PATH": "${env:USERPROFILE}\\scoop\\apps\\mingw\\current\\bin;${env:USERPROFILE}\\scoop\\shims;${env:PATH}"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false
+      }
+    },
+    {
+      "label": "Run: Frontend",
+      "type": "shell",
+      "command": "npm run dev -- --host 127.0.0.1",
+      "options": {
+        "cwd": "${workspaceFolder}\\client"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false
+      }
+    },
+    {
+      "label": "Run: Full app",
+      "dependsOn": ["Run: Backend", "Run: Frontend"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop: App background processes",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "$workspace = [System.IO.Path]::GetFullPath('${workspaceFolder}').TrimEnd('\\'); $client = Join-Path $workspace 'client'; $serverExe = Join-Path $workspace 'target\\debug\\virtual-cinema-server.exe'; $appProcesses = @(Get-CimInstance Win32_Process | Where-Object { ($_.Name -ieq 'virtual-cinema-server.exe' -and $_.ExecutablePath -and $_.ExecutablePath -ieq $serverExe) -or ($_.Name -ieq 'node.exe' -and $_.CommandLine -and $_.CommandLine.IndexOf($client, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and $_.CommandLine -match '(?i)node_modules[\\\\/]vite[\\\\/]') }); if ($appProcesses.Count -eq 0) { Write-Output 'No Threater backend or Vite processes are running.'; exit 0 }; foreach ($process in $appProcesses) { Write-Output \"Stopping $($process.Name) (PID $($process.ProcessId))\"; Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop }; Start-Sleep -Milliseconds 500; $remaining = @(Get-CimInstance Win32_Process | Where-Object { ($_.Name -ieq 'virtual-cinema-server.exe' -and $_.ExecutablePath -and $_.ExecutablePath -ieq $serverExe) -or ($_.Name -ieq 'node.exe' -and $_.CommandLine -and $_.CommandLine.IndexOf($client, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and $_.CommandLine -match '(?i)node_modules[\\\\/]vite[\\\\/]') }); if ($remaining.Count -gt 0) { Write-Error \"Could not stop matching Threater process IDs: $($remaining.ProcessId -join ', ')\"; exit 1 }; Write-Output 'Threater backend and Vite processes stopped.'"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
