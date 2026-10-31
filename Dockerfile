@@ -11,6 +11,7 @@ RUN npm ci
 
 # Copy source and compile production bundle
 COPY client/ ./
+ENV BASE_URL=/fun/
 RUN npm run build
 
 # ==============================================================================
@@ -70,7 +71,7 @@ COPY --from=client-builder --chown=threater:threater /build/client/dist /app/cli
 USER threater
 
 # Configure production environment defaults
-ENV THREATER_ADDR=0.0.0.0:3000 \
+ENV THREATER_ADDR=0.0.0.0:3030 \
     DATABASE_URL=sqlite:///app/data/threater.db \
     CLIENT_DIST=/app/client/dist \
     THREATER_DEV_AUTH=true \
@@ -80,10 +81,10 @@ ENV THREATER_ADDR=0.0.0.0:3000 \
 # Persistent volume for SQLite database
 VOLUME ["/app/data"]
 
-EXPOSE 3000
+EXPOSE 3030
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://127.0.0.1:3000/health || exit 1
+    CMD curl -fsS http://127.0.0.1:3030/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/virtual-cinema-server"]

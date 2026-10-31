@@ -1,0 +1,207 @@
+name: 🚀 Deploy Threater (Virtual Cinema)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.vscode/**'
+      - '.editorconfig'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry Run (Verify SSH & check config without touching live services)'
+        required: true
+        type: boolean
+        default: false
+      rebuild_docker:
+        description: 'Force clean Docker rebuild'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threater-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  pre-flight-check:
+    name: 🛡️ Pre-Flight Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: 📦 Install Client Dependencies
+        run: npm --prefix client ci
+
+      - name: 🏗️ Verify Frontend Build
+        env:
+          BASE_URL: /fun/
+        run: npm --prefix client run build
+
+      - name: 🦀 Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+          components: rustfmt, clippy
+
+      - name: ⚡ Cache Rust Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server -> target
+
+      - name: 🔍 Cargo Verification Suite
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo check --manifest-path server/Cargo.toml
+          cargo test --manifest-path server/Cargo.toml
+
+  deploy-production:
+    name: 🚀 Deploy to Production Host (COS)
+    needs: [pre-flight-check]
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST || secrets.COS_HOST || '129.154.32.125' }}
+      SSH_USER: ${{ secrets.SSH_USER || secrets.COS_USER || 'ubuntu' }}
+      SSH_KEY: ${{ secrets.SSH_KEY || secrets.COS_SSH_PRIVATE_KEY }}
+      TARGET_DIR: /home/ubuntu/stack/apps/threater
+      DRY_RUN: ${{ github.event.inputs.dry_run || false }}
+      REBUILD_DOCKER: ${{ github.event.inputs.rebuild_docker || false }}
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Verify Deployment Secrets
+        run: |
+          echo "Verifying deployment credentials..."
+          ERRORS=0
+          if [ -z "$SSH_HOST" ]; then
+            echo "❌ ERROR: SSH_HOST / COS_HOST secret is missing!"
+            ERRORS=$((ERRORS + 1))
+          fi
+          if [ -z "$SSH_USER" ]; then
+            echo "❌ ERROR: SSH_USER / COS_USER secret is missing!"
+            ERRORS=$((ERRORS + 1))
+          fi
+          if [ -z "$SSH_KEY" ]; then
+            echo "❌ ERROR: SSH_KEY / COS_SSH_PRIVATE_KEY secret is missing!"
+            ERRORS=$((ERRORS + 1))
+          fi
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+          echo "✅ All deployment credentials present."
+
+      - name: 🔌 Setup SSH & Deploy to Ubuntu
+        run: |
+          set -euo pipefail
+
+          # 1. Setup SSH Directory & Key
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          if echo "$SSH_KEY" | grep -q "^LS0t"; then
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          elif echo "$SSH_KEY" | grep -q "BEGIN"; then
+            echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key 2>/dev/null || echo "$SSH_KEY" > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+
+          cat << 'EOF' > ~/.ssh/config
+          Host production
+            HostName ${{ env.SSH_HOST }}
+            User ${{ env.SSH_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            Port 22
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+          EOF
+          chmod 600 ~/.ssh/config
+
+          # 2. Safety Pre-Flight on Target Host
+          echo "🛡️ Step 1: Ensuring destination directories and permissions..."
+          ssh production "mkdir -p $TARGET_DIR/data && chmod -R u+rwX $TARGET_DIR"
+
+          # 3. Dry Run Exit
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🔍 DRY RUN: Pre-flight checks and SSH connection verified successfully."
+            echo "No production containers or files were modified."
+            exit 0
+          fi
+
+          # 4. Lean Rsync Sync to stack/apps/threater
+          echo "📦 Step 2: Syncing build & source files via rsync..."
+          rsync -avz --delete \
+            --exclude='/data/*.db*' \
+            --exclude='/data/backups' \
+            --exclude='/.git' \
+            --exclude='/client/node_modules' \
+            --exclude='/client/dist' \
+            --exclude='/server/target' \
+            --exclude='/target' \
+            ./ production:"$TARGET_DIR/"
+
+          # 5. Remote Docker Build & Container Restart
+          echo "🔄 Step 3: Building and deploying Threater container on COS..."
+          ssh production bash -s << 'REMOTESCRIPT'
+          set -e
+          cd /home/ubuntu/stack/apps/threater
+
+          # Rebuild and start container using stack convention
+          docker compose down --remove-orphans || true
+          docker compose build --pull
+          docker compose up -d
+
+          # Wait up to 30 seconds for health check
+          echo "⏳ Waiting for Threater healthcheck on port 3030..."
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:3030/health > /dev/null 2>&1; then
+              echo "✅ Threater is healthy on COS port 3030 (attempt $i)!"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "❌ Container failed to become healthy within 30 seconds"
+          docker compose logs --tail 50
+          exit 1
+          REMOTESCRIPT
+
+          echo "======================================================"
+          echo "🎉 Threater Production Deployment Complete!"
+          echo "======================================================"
+
+      - name: ✅ Smoke Test — https://faizal.uk/fun
+        if: ${{ env.DRY_RUN != 'true' }}
+        run: |
+          echo "⏳ Verifying live public endpoint https://faizal.uk/fun/..."
+          SUCCESS=false
+          for i in $(seq 1 15); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 5 "https://faizal.uk/fun/" || echo "000")
+            if [ "$HTTP" = "200" ]; then
+              SUCCESS=true
+              echo "✅ https://faizal.uk/fun/ is live and serving HTTP 200 (after ${i}s)!"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Smoke test FAILED after 30s (HTTP: $HTTP)"
+            exit 1
+          fi

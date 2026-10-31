@@ -90,7 +90,11 @@ async fn resolve_media(
             stream_url: raw_url.to_string(),
             proxy_url,
             is_curved_compatible: true,
-            format: if lower.ends_with(".m3u8") { "hls".into() } else { "mp4".into() },
+            format: if lower.ends_with(".m3u8") {
+                "hls".into()
+            } else {
+                "mp4".into()
+            },
             duration_seconds: None,
             thumbnail: None,
         }));
@@ -183,8 +187,8 @@ async fn resolve_via_yt_dlp(raw_url: &str) -> Result<ResolvedMedia, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let val: serde_json::Value = serde_json::from_str(&stdout)
-        .map_err(|e| format!("Invalid yt-dlp JSON: {e}"))?;
+    let val: serde_json::Value =
+        serde_json::from_str(&stdout).map_err(|e| format!("Invalid yt-dlp JSON: {e}"))?;
 
     let direct_url = val["url"]
         .as_str()
@@ -227,17 +231,22 @@ async fn resolve_via_invidious(client: &Client, video_id: &str) -> Result<Resolv
             Err(_) => continue,
         };
 
-        let title = json["title"].as_str().unwrap_or("YouTube Cinema Video").to_string();
+        let title = json["title"]
+            .as_str()
+            .unwrap_or("YouTube Cinema Video")
+            .to_string();
         let duration = json["lengthSeconds"].as_f64();
 
         // Search formatStreams for progressive MP4 stream with audio
         if let Some(formats) = json["formatStreams"].as_array() {
             // Find highest resolution progressive MP4 stream
             if let Some(fmt) = formats.iter().rev().find(|f| {
-                f["container"].as_str() == Some("mp4") || f["type"].as_str().unwrap_or("").contains("video/mp4")
+                f["container"].as_str() == Some("mp4")
+                    || f["type"].as_str().unwrap_or("").contains("video/mp4")
             }) {
                 if let Some(stream_url) = fmt["url"].as_str() {
-                    let proxy_url = format!("/api/media/proxy?url={}", urlencoding::encode(stream_url));
+                    let proxy_url =
+                        format!("/api/media/proxy?url={}", urlencoding::encode(stream_url));
                     return Ok(ResolvedMedia {
                         title,
                         stream_url: stream_url.to_string(),
@@ -290,7 +299,9 @@ async fn proxy_media(
     let upstream_headers = upstream.headers().clone();
 
     // Convert upstream byte stream into Axum response body
-    let body_stream = upstream.bytes_stream().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+    let body_stream = upstream
+        .bytes_stream()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
     let body = Body::from_stream(body_stream);
 
     let mut res = Response::builder().status(status);
@@ -323,7 +334,8 @@ async fn proxy_media(
         "Content-Range, Content-Length, Accept-Ranges",
     );
 
-    res.body(body).unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+    res.body(body)
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 fn is_youtube_url(url: &str) -> bool {

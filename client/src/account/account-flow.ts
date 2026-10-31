@@ -1,4 +1,5 @@
 import type { AccountProfile, UsernameAvailability } from "../shared/types";
+import { apiUrl } from "../utils/api-url";
 
 const $ = <T extends HTMLElement>(id: string) => {
   const element = document.getElementById(id);
@@ -56,7 +57,7 @@ export class AccountFlow {
   async initialize() {
     this.profileSubmit.disabled = true;
     try {
-      const response = await fetch("/api/account/bootstrap", { credentials: "same-origin" });
+      const response = await fetch(apiUrl("/api/account/bootstrap"), { credentials: "same-origin" });
       const result = (await response.json()) as AccountProfile | { error?: string };
       if (!response.ok || !("profile_complete" in result)) {
         throw new Error("error" in result && result.error ? result.error : "Could not load your profile.");
@@ -105,7 +106,7 @@ export class AccountFlow {
     this.usernameStatus.textContent = "Checking availability…";
     this.usernameStatus.className = "field-status checking";
     try {
-      const response = await fetch(`/api/account/username-availability?username=${encodeURIComponent(username)}`);
+      const response = await fetch(apiUrl(`/api/account/username-availability?username=${encodeURIComponent(username)}`));
       const result = (await response.json()) as UsernameAvailability;
       if (!response.ok) throw new Error("Username availability could not be checked.");
       if (requestId !== this.usernameCheckRequest) return false;
@@ -138,7 +139,7 @@ export class AccountFlow {
     }
     this.profileSubmit.disabled = true;
     try {
-      const response = await fetch("/api/account/profile", {
+      const response = await fetch(apiUrl("/api/account/profile"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -21,7 +21,8 @@ export class RoomConnection {
 
   connect(roomId: string) {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    this.socket = new WebSocket(`${protocol}//${location.host}/ws`);
+    const pathPrefix = location.pathname.startsWith("/fun") ? "/fun" : "";
+    this.socket = new WebSocket(`${protocol}//${location.host}${pathPrefix}/ws`);
     this.socket.addEventListener("open", () => {
       this.options.onStatus("connected");
       this.send({ type: "join_room", room_id: roomId });

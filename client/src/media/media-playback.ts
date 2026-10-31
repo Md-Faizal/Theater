@@ -3,6 +3,7 @@ import { CSS3DObject } from "three/addons/renderers/CSS3DRenderer.js";
 import type Hls from "hls.js";
 import type { VideoState } from "../shared/types";
 import type { SpatialAudio } from "../audio/spatial-audio";
+import { apiUrl } from "../utils/api-url";
 
 interface YoutubePlayer {
   getCurrentTime?(): number;
@@ -205,7 +206,7 @@ export class MediaPlayback {
     is_curved_compatible: boolean;
   } | null> {
     try {
-      const res = await fetch(`/api/media/resolve?url=${encodeURIComponent(url)}`, {
+      const res = await fetch(apiUrl(`/api/media/resolve?url=${encodeURIComponent(url)}`), {
         signal: AbortSignal.timeout(9000),
       });
       if (!res.ok) return null;
