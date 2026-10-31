@@ -69,14 +69,15 @@ jobs:
           cargo test --manifest-path server/Cargo.toml
 
   deploy-production:
-    name: 🚀 Deploy to Production Host (COS)
+    name: 🚀 Deploy to Production Host
     needs: [pre-flight-check]
     runs-on: ubuntu-latest
     env:
-      SSH_HOST: ${{ secrets.COS_SSH_HOST || secrets.SSH_HOST || secrets.COS_HOST || '129.154.32.125' }}
-      SSH_USER: ${{ secrets.COS_SSH_USER || secrets.SSH_USER || secrets.COS_USER || 'ubuntu' }}
-      SSH_KEY: ${{ secrets.COS_SSH_KEY || secrets.SSH_KEY || secrets.COS_SSH_PRIVATE_KEY }}
-      TARGET_DIR: /home/ubuntu/stack/apps/threater
+      SSH_HOST: ${{ secrets.COS_SSH_HOST || secrets.SSH_HOST || secrets.DEPLOY_HOST }}
+      SSH_USER: ${{ secrets.COS_SSH_USER || secrets.SSH_USER || secrets.DEPLOY_USER || 'ubuntu' }}
+      SSH_KEY: ${{ secrets.COS_SSH_KEY || secrets.SSH_KEY || secrets.DEPLOY_KEY }}
+      TARGET_DIR: ${{ secrets.DEPLOY_TARGET_DIR || '/home/ubuntu/stack/apps/threater' }}
+      PUBLIC_URL: ${{ secrets.PUBLIC_APP_URL || 'https://faizal.uk/fun' }}
       DRY_RUN: ${{ github.event.inputs.dry_run || false }}
       REBUILD_DOCKER: ${{ github.event.inputs.rebuild_docker || false }}
     steps:
@@ -88,15 +89,15 @@ jobs:
           echo "Verifying deployment credentials..."
           ERRORS=0
           if [ -z "$SSH_HOST" ]; then
-            echo "❌ ERROR: SSH_HOST / COS_HOST secret is missing!"
+            echo "❌ ERROR: SSH_HOST secret is missing!"
             ERRORS=$((ERRORS + 1))
           fi
           if [ -z "$SSH_USER" ]; then
-            echo "❌ ERROR: SSH_USER / COS_USER secret is missing!"
+            echo "❌ ERROR: SSH_USER secret is missing!"
             ERRORS=$((ERRORS + 1))
           fi
           if [ -z "$SSH_KEY" ]; then
-            echo "❌ ERROR: SSH_KEY / COS_SSH_PRIVATE_KEY secret is missing!"
+            echo "❌ ERROR: SSH_KEY secret is missing!"
             ERRORS=$((ERRORS + 1))
           fi
           if [ $ERRORS -gt 0 ]; then
@@ -158,10 +159,10 @@ jobs:
             ./ production:"$TARGET_DIR/"
 
           # 5. Remote Docker Build & Container Restart
-          echo "🔄 Step 3: Building and deploying Threater container on COS..."
-          ssh production bash -s << 'REMOTESCRIPT'
+          echo "🔄 Step 3: Building and deploying Threater container..."
+          ssh production bash -s << REMOTESCRIPT
           set -e
-          cd /home/ubuntu/stack/apps/threater
+          cd "${{ env.TARGET_DIR }}"
 
           # Rebuild and start container using stack convention
           docker compose down --remove-orphans || true
@@ -170,9 +171,9 @@ jobs:
 
           # Wait up to 30 seconds for health check
           echo "⏳ Waiting for Threater healthcheck on port 3030..."
-          for i in $(seq 1 15); do
+          for i in \$(seq 1 15); do
             if curl -fsS http://127.0.0.1:3030/health > /dev/null 2>&1; then
-              echo "✅ Threater is healthy on COS port 3030 (attempt $i)!"
+              echo "✅ Threater is healthy on port 3030 (attempt \$i)!"
               exit 0
             fi
             sleep 2
@@ -187,16 +188,16 @@ jobs:
           echo "🎉 Threater Production Deployment Complete!"
           echo "======================================================"
 
-      - name: ✅ Smoke Test — https://faizal.uk/fun
-        if: ${{ env.DRY_RUN != 'true' }}
+      - name: ✅ Smoke Test Live Public Endpoint
+        if: ${{ env.DRY_RUN != 'true' && env.PUBLIC_URL != '' }}
         run: |
-          echo "⏳ Verifying live public endpoint https://faizal.uk/fun/..."
+          echo "⏳ Verifying live public endpoint ${{ env.PUBLIC_URL }}/..."
           SUCCESS=false
           for i in $(seq 1 15); do
-            HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 5 "https://faizal.uk/fun/" || echo "000")
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 5 "${{ env.PUBLIC_URL }}/" || echo "000")
             if [ "$HTTP" = "200" ]; then
               SUCCESS=true
-              echo "✅ https://faizal.uk/fun/ is live and serving HTTP 200 (after ${i}s)!"
+              echo "✅ Endpoint ${{ env.PUBLIC_URL }}/ is live and serving HTTP 200 (after ${i}s)!"
               break
             fi
             sleep 2

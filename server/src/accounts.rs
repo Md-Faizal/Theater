@@ -32,6 +32,7 @@ pub struct AccountProfile {
     pub avatar_color: String,
     pub profile_complete: bool,
     pub is_development_session: bool,
+    pub google_client_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -192,6 +193,7 @@ async fn load_profile(pool: &SqlitePool, user: SessionUser) -> Result<AccountPro
     let username: Option<String> = row.get("username");
     let display_name: String = row.get("display_name");
     let avatar_color: String = row.get("avatar_color");
+    let google_client_id = std::env::var("GOOGLE_CLIENT_ID").ok().filter(|id| !id.trim().is_empty());
     Ok(AccountProfile {
         user_id: user.user_id,
         profile_complete: username.is_some(),
@@ -199,6 +201,7 @@ async fn load_profile(pool: &SqlitePool, user: SessionUser) -> Result<AccountPro
         display_name,
         avatar_color,
         is_development_session: user.development_session,
+        google_client_id,
     })
 }
 
@@ -489,9 +492,16 @@ async fn google_login(
         }
     };
 
-    let configured_client_id = std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| {
-        "1018234915270-6h216gbkq8rcepmhhq4tnsgjlmr04gf2.apps.googleusercontent.com".to_string()
-    });
+    let configured_client_id = match std::env::var("GOOGLE_CLIENT_ID") {
+        Ok(id) if !id.trim().is_empty() => id,
+        _ => {
+            tracing::error!("GOOGLE_CLIENT_ID is not configured in environment");
+            return Err(ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Google sign-in is not configured on this server",
+            ));
+        }
+    };
     if let Some(aud) = token_info.aud {
         if aud != configured_client_id {
             tracing::warn!(%aud, %configured_client_id, "Google token audience mismatch");

@@ -26,6 +26,7 @@ export interface AccountProfile {
   avatar_color: string;
   profile_complete: boolean;
   is_development_session: boolean;
+  google_client_id?: string | null;
 }
 
 export interface UsernameAvailability {

@@ -1,7 +1,6 @@
 services:
   # ============================================================================
   # All-in-One Production Deployment (Client + Server + SQLite)
-  # Matches ~/stack conventions across cos and my-mac
   # ============================================================================
   threater:
     build:
@@ -23,7 +22,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - RUST_LOG=${RUST_LOG:-info}
     volumes:
-      - /home/ubuntu/stack/apps/threater/data:/app/data
+      - ${THREATER_DATA_PATH:-./data}:/app/data
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3030/health"]
       interval: 15s
@@ -42,3 +41,4 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+

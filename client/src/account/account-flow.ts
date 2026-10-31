@@ -72,19 +72,19 @@ export class AccountFlow {
       this.avatarColorInput.value = result.avatar_color;
       this.usernameStatus.textContent = "Choose a unique username for this room community.";
       this.profileUsernameInput.focus();
-      this.initGoogleAuth();
+      this.initGoogleAuth(result.google_client_id);
     } catch (error) {
       this.joinError.textContent = error instanceof Error
         ? `${error.message} Click 'Enter IMAX (Solo Mode)' to explore and watch videos immediately.`
         : "Multiplayer server offline. Click 'Enter IMAX (Solo Mode)' below.";
       this.usernameStatus.textContent = "Multiplayer service offline.";
       this.usernameStatus.className = "field-status unavailable";
-      this.initGoogleAuth();
+      this.initGoogleAuth(null);
     }
   }
 
-  private initGoogleAuth() {
-    const googleClientId = "1018234915270-6h216gbkq8rcepmhhq4tnsgjlmr04gf2.apps.googleusercontent.com";
+  private initGoogleAuth(googleClientId: string | null | undefined) {
+    if (!googleClientId) return;
     const container = document.getElementById("google-login-btn-container");
     if (!container) return;
 
