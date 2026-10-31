@@ -1,0 +1,48 @@
+# ==============================================================================
+# Multi-stage Fallback Dockerfile (When building from raw source without CI)
+# ==============================================================================
+FROM node:22-bookworm-slim AS client-builder
+WORKDIR /build/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+ENV BASE_URL=/fun/
+RUN npm run build
+
+FROM rust:latest AS server-builder
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY server/Cargo.toml server/
+RUN mkdir -p server/src && \
+    echo "fn main() {}" > server/src/main.rs && \
+    cargo build --release -p virtual-cinema-server && \
+    rm -rf server/src
+COPY server/src server/src
+COPY server/migrations server/migrations
+RUN touch server/src/main.rs && \
+    cargo build --release -p virtual-cinema-server && \
+    strip /build/target/release/virtual-cinema-server
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates libssl3 sqlite3 curl && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN groupadd -r threater && useradd -r -g threater threater && \
+    mkdir -p /app/data /app/client/dist && \
+    chown -R threater:threater /app
+COPY --from=server-builder /build/target/release/virtual-cinema-server /usr/local/bin/virtual-cinema-server
+COPY --from=client-builder --chown=threater:threater /build/client/dist /app/client/dist
+USER threater
+ENV THREATER_ADDR=0.0.0.0:3030 \
+    DATABASE_URL=sqlite:///app/data/threater.db \
+    CLIENT_DIST=/app/client/dist \
+    THREATER_DEV_AUTH=false \
+    THREATER_COOKIE_SECURE=true \
+    RUST_LOG=info
+VOLUME ["/app/data"]
+EXPOSE 3030
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:3030/health || exit 1
+ENTRYPOINT ["/usr/local/bin/virtual-cinema-server"]

@@ -1,51 +1,9 @@
 # ==============================================================================
-# Stage 1: Build Frontend (Three.js WebGPU / Vite Client)
-# ==============================================================================
-FROM node:22-bookworm-slim AS client-builder
-
-WORKDIR /build/client
-
-# Install dependencies using clean install
-COPY client/package*.json ./
-RUN npm ci
-
-# Copy source and compile production bundle
-COPY client/ ./
-ENV BASE_URL=/fun/
-RUN npm run build
-
-# ==============================================================================
-# Stage 2: Build Backend (Rust Axum / SQLite Server)
-# ==============================================================================
-FROM rust:latest AS server-builder
-
-WORKDIR /build
-
-# Copy Cargo workspace configuration
-COPY Cargo.toml Cargo.lock ./
-COPY server/Cargo.toml server/
-
-# Create dummy source to cache dependency compilation
-RUN mkdir -p server/src && \
-    echo "fn main() {}" > server/src/main.rs && \
-    cargo build --release -p virtual-cinema-server && \
-    rm -rf server/src
-
-# Copy real source code and migrations
-COPY server/src server/src
-COPY server/migrations server/migrations
-
-# Touch main.rs to invalidate the dummy build and compile release binary
-RUN touch server/src/main.rs && \
-    cargo build --release -p virtual-cinema-server && \
-    strip /build/target/release/virtual-cinema-server
-
-# ==============================================================================
-# Stage 3: Production Runtime Image (< 60MB minimal footprint)
+# Ultra-Fast Cached Production Dockerfile
+# Leverages Docker Layer Caching + Precompiled GitHub Actions Binaries
 # ==============================================================================
 FROM debian:bookworm-slim AS runtime
 
-# Install essential runtime libraries
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -56,35 +14,29 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Create non-root user for security
 RUN groupadd -r threater && useradd -r -g threater threater && \
     mkdir -p /app/data /app/client/dist && \
     chown -R threater:threater /app
 
-# Copy compiled backend binary from Stage 2
-COPY --from=server-builder /build/target/release/virtual-cinema-server /usr/local/bin/virtual-cinema-server
+# Copy prebuilt artifacts (built in seconds via CI runners or local build)
+COPY --chown=threater:threater bin/virtual-cinema-server /usr/local/bin/virtual-cinema-server
+COPY --chown=threater:threater client/dist /app/client/dist
 
-# Copy compiled frontend distribution from Stage 1
-COPY --from=client-builder --chown=threater:threater /build/client/dist /app/client/dist
+RUN chmod +x /usr/local/bin/virtual-cinema-server
 
-# Switch to non-root user
 USER threater
 
-# Configure production environment defaults
 ENV THREATER_ADDR=0.0.0.0:3030 \
     DATABASE_URL=sqlite:///app/data/threater.db \
     CLIENT_DIST=/app/client/dist \
-    THREATER_DEV_AUTH=true \
-    THREATER_COOKIE_SECURE=false \
+    THREATER_DEV_AUTH=false \
+    THREATER_COOKIE_SECURE=true \
     RUST_LOG=info
 
-# Persistent volume for SQLite database
 VOLUME ["/app/data"]
-
 EXPOSE 3030
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -fsS http://127.0.0.1:3030/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/virtual-cinema-server"]
