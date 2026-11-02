@@ -193,7 +193,9 @@ async fn load_profile(pool: &SqlitePool, user: SessionUser) -> Result<AccountPro
     let username: Option<String> = row.get("username");
     let display_name: String = row.get("display_name");
     let avatar_color: String = row.get("avatar_color");
-    let google_client_id = std::env::var("GOOGLE_CLIENT_ID").ok().filter(|id| !id.trim().is_empty());
+    let google_client_id = std::env::var("GOOGLE_CLIENT_ID")
+        .ok()
+        .filter(|id| !id.trim().is_empty());
     Ok(AccountProfile {
         user_id: user.user_id,
         profile_complete: username.is_some(),
