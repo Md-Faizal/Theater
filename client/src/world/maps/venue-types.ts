@@ -19,6 +19,9 @@ export interface Venue {
   screenPosition: Vec3;
   screenLight?: THREE.PointLight;
   houseLights?: THREE.PointLight[];
+  screenTwoMesh?: THREE.Mesh;
+  screenTwoPosition?: Vec3;
+  screenTwoLight?: THREE.PointLight;
   setCinemaDimming?: (dimmed: boolean) => void;
   updateDoors?: (playerPos: THREE.Vector3, delta: number) => void;
   pushDoor?: (dir?: number) => void;

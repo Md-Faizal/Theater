@@ -98,11 +98,14 @@ export function buildEntertainmentMall(builder: VenueBuilder) {
     emissiveIntensity: 1.5,
   });
 
-  // East Wall (Screen 1 IMAX Integration Wall at X = 2.2)
-  // Flanking North and South solid theater shell walls
+  // East Wall (Screen 1 IMAX & Screen 2 Velvet Lounge Portals at X = 2.2)
+  // North theater shell wall
   addBox("mall-east-wall-n", [0.8, mallHeight, 29.4], [2.2, mallHeight / 2, 17.3], architecturalDark, { solid: true });
-  addBox("mall-east-wall-s", [0.8, mallHeight, 29.4], [2.2, mallHeight / 2, -17.3], architecturalDark, { solid: true });
-  // Cinema Entrance Opening Header above portal (Y = 4.2 to 15.0)
+  // South theater shell wall split to provide open portal for Screen 2 at Z = -23.0 (width 3.6m)
+  addBox("mall-east-wall-s-between", [0.8, mallHeight, 18.6], [2.2, mallHeight / 2, -11.9], architecturalDark, { solid: true });
+  addBox("mall-east-wall-s-south", [0.8, mallHeight, 7.2], [2.2, mallHeight / 2, -28.4], architecturalDark, { solid: true });
+  addBox("mall-east-wall-s2-header", [0.8, mallHeight - 3.2, 3.6], [2.2, 3.2 + (mallHeight - 3.2) / 2, -23.0], architecturalDark, { solid: true });
+  // Screen 1 Cinema Entrance Opening Header above portal (Y = 4.2 to 15.0)
   addBox("mall-east-wall-header", [0.8, mallHeight - 4.2, 5.4], [2.2, 4.2 + (mallHeight - 4.2) / 2, 0], architecturalDark, { solid: true });
 
   // C. Soaring Vaulted Skylight Roof (Y = 15.0m)

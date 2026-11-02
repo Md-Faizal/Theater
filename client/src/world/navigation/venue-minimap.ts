@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { IMAX_LAYOUT, screenRowX } from "../maps/screens/screen-1-imax/layout";
+import { SCREEN_TWO_LAYOUT } from "../maps/screens/screen-2-lounge/layout";
 
 const MAP_WIDTH = 270;
 const MAP_HEIGHT = 165;
@@ -251,7 +252,55 @@ export class VenueMinimap {
     context.fillText("38.8 × 21 m", pMid.x - 3, pMid.y + 8);
 
     // =========================================================================
-    // 3. PLAYER POSITION & HEADING ARROW
+    // 3. SCREEN 2: THE VELVET LOUNGE (Low-Seating VIP Immersive Theater)
+    // =========================================================================
+    const s2TopLeft = mapPoint(SCREEN_TWO_LAYOUT.roomStartX, SCREEN_TWO_LAYOUT.centerZ + SCREEN_TWO_LAYOUT.halfWidth);
+    const s2BotRight = mapPoint(SCREEN_TWO_LAYOUT.roomEndX, SCREEN_TWO_LAYOUT.centerZ - SCREEN_TWO_LAYOUT.halfWidth);
+    context.fillStyle = "#0c0e18";
+    context.fillRect(s2TopLeft.x, s2TopLeft.y, s2BotRight.x - s2TopLeft.x, s2BotRight.y - s2TopLeft.y);
+    context.strokeStyle = "#d4af3766";
+    context.lineWidth = 1.5;
+    context.strokeRect(s2TopLeft.x, s2TopLeft.y, s2BotRight.x - s2TopLeft.x, s2BotRight.y - s2TopLeft.y);
+
+    // Screen 2 Entrance Portal
+    const s2DoorTopLeft = mapPoint(SCREEN_TWO_LAYOUT.portalX - 0.2, SCREEN_TWO_LAYOUT.centerZ + SCREEN_TWO_LAYOUT.portalWidth / 2);
+    const s2DoorBotRight = mapPoint(SCREEN_TWO_LAYOUT.portalX + 0.2, SCREEN_TWO_LAYOUT.centerZ - SCREEN_TWO_LAYOUT.portalWidth / 2);
+    context.fillStyle = "#d4af37";
+    context.fillRect(s2DoorTopLeft.x, s2DoorTopLeft.y, s2DoorBotRight.x - s2DoorTopLeft.x, s2DoorBotRight.y - s2DoorTopLeft.y);
+
+    // Sunken Conversation Lounge Pit
+    const pitTopLeft = mapPoint(SCREEN_TWO_LAYOUT.pitStartX, SCREEN_TWO_LAYOUT.centerZ + SCREEN_TWO_LAYOUT.pitHalfWidth);
+    const pitBotRight = mapPoint(SCREEN_TWO_LAYOUT.pitEndX, SCREEN_TWO_LAYOUT.centerZ - SCREEN_TWO_LAYOUT.pitHalfWidth);
+    context.fillStyle = "#06070c";
+    context.fillRect(pitTopLeft.x, pitTopLeft.y, pitBotRight.x - pitTopLeft.x, pitBotRight.y - pitTopLeft.y);
+    context.strokeStyle = "#ffb050aa";
+    context.lineWidth = 1.2;
+    context.strokeRect(pitTopLeft.x, pitTopLeft.y, pitBotRight.x - pitTopLeft.x, pitBotRight.y - pitTopLeft.y);
+
+    context.fillStyle = "#ffb050";
+    context.font = "600 6px sans-serif";
+    context.textAlign = "center";
+    context.fillText("SUNKEN PIT", (pitTopLeft.x + pitBotRight.x) / 2, (pitTopLeft.y + pitBotRight.y) / 2);
+
+    // Screen 2 Curved Cinemascope Screen
+    const s2Top = mapPoint(SCREEN_TWO_LAYOUT.screenBaseX - 0.8, SCREEN_TWO_LAYOUT.centerZ + SCREEN_TWO_LAYOUT.screenWidth / 2);
+    const s2Mid = mapPoint(SCREEN_TWO_LAYOUT.screenBaseX, SCREEN_TWO_LAYOUT.centerZ);
+    const s2Bot = mapPoint(SCREEN_TWO_LAYOUT.screenBaseX - 0.8, SCREEN_TWO_LAYOUT.centerZ - SCREEN_TWO_LAYOUT.screenWidth / 2);
+    const s2Curve = mapPoint(SCREEN_TWO_LAYOUT.screenBaseX + 0.8, SCREEN_TWO_LAYOUT.centerZ);
+    context.beginPath();
+    context.moveTo(s2Top.x, s2Top.y);
+    context.quadraticCurveTo(s2Curve.x, s2Curve.y, s2Bot.x, s2Bot.y);
+    context.strokeStyle = "#ffd700";
+    context.lineWidth = 3.0;
+    context.stroke();
+
+    context.fillStyle = "#ffd700";
+    context.font = "700 6.5px sans-serif";
+    context.textAlign = "center";
+    context.fillText("SCREEN 2 · VIP", s2Mid.x - 3, s2Mid.y);
+
+    // =========================================================================
+    // 4. PLAYER POSITION & HEADING ARROW
     // =========================================================================
     const player = mapPoint(position.x, position.z);
     context.save();
