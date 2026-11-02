@@ -151,7 +151,7 @@ jobs:
           chmod 600 ~/.ssh/config
 
           echo "🛡️ Ensuring target directories on remote host..."
-          ssh production "mkdir -p $TARGET_DIR/data && touch $TARGET_DIR/.env && chmod -R u+rwX $TARGET_DIR"
+          ssh production "mkdir -p $TARGET_DIR/data && chmod -R 777 $TARGET_DIR/data && touch $TARGET_DIR/.env && chmod -R u+rwX $TARGET_DIR"
 
           if [ "$DRY_RUN" = "true" ]; then
             echo "🔍 DRY RUN: Build and SSH verified. Exiting."

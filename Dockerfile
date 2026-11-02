@@ -2,7 +2,7 @@
 # Ultra-Fast Cached Production Dockerfile
 # Leverages Docker Layer Caching + Precompiled GitHub Actions Binaries
 # ==============================================================================
-FROM debian:bookworm-slim AS runtime
+FROM ubuntu:24.04 AS runtime
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -14,17 +14,14 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN groupadd -r threater && useradd -r -g threater threater && \
-    mkdir -p /app/data /app/client/dist && \
-    chown -R threater:threater /app
+RUN mkdir -p /app/data /app/client/dist && \
+    chmod 777 /app/data
 
 # Copy prebuilt artifacts (built in seconds via CI runners or local build)
-COPY --chown=threater:threater bin/virtual-cinema-server /usr/local/bin/virtual-cinema-server
-COPY --chown=threater:threater client/dist /app/client/dist
+COPY bin/virtual-cinema-server /usr/local/bin/virtual-cinema-server
+COPY client/dist /app/client/dist
 
 RUN chmod +x /usr/local/bin/virtual-cinema-server
-
-USER threater
 
 ENV THREATER_ADDR=0.0.0.0:3030 \
     DATABASE_URL=sqlite:///app/data/threater.db \
