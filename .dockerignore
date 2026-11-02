@@ -8,7 +8,6 @@ target/
 # Node.js dependencies and builds
 node_modules/
 client/node_modules/
-client/dist/
 *.tsbuildinfo
 client/tsconfig.tsbuildinfo
 tsconfig.tsbuildinfo

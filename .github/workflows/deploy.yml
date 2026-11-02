@@ -71,7 +71,7 @@ jobs:
           name: threater-build-artifacts
           path: |
             bin/virtual-cinema-server
-            client/dist/
+            client/dist
           retention-days: 1
 
   deploy-production:
@@ -93,6 +93,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: threater-build-artifacts
+          path: ./
+
+      - name: 🔍 Inspect Downloaded Artifacts
+        run: |
+          ls -la bin/
+          ls -la client/dist/
 
       - name: 🔍 Verify Deployment Secrets
         run: |
